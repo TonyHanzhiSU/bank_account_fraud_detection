@@ -67,7 +67,7 @@ This repository contains the following key scripts:
         bash install.sh
         ```
 
-4.  **`train_xgboost_adasyn.py`**
+4.  **`train_xgboost.py`**
     * **Purpose:** Loads the processed feature data using Spark, collects it to the driver node, applies ADASYN oversampling, trains an XGBoost classifier locally, evaluates it, and saves the trained model as a pickle file to the master node's local filesystem.
     * **Prerequisites:** Run `install.sh` first to install dependencies locally on the master node.
     * **Usage:**
@@ -76,7 +76,7 @@ This repository contains the following key scripts:
         spark-submit \
           --master yarn \
           --deploy-mode client \
-          train_xgboost_adasyn.py \
+          train_xgboost.py \
             --input <HDFS_or_GCS_path_to_processed_features> \
             --model-out <local_path_on_master_node_for_pkl_model> \
             --sampling-strategy <e.g., 0.5>
@@ -86,7 +86,7 @@ This repository contains the following key scripts:
         spark-submit \
           --master yarn \
           --deploy-mode client \
-          train_xgboost_adasyn.py \
+          train_xgboost.py \
             --input hdfs:///user/hs5413_nyu_edu/bank_fraud_data/processed_features/ \
             --model-out ./xgb_adasyn_model.pkl \
             --sampling-strategy 0.8
@@ -98,5 +98,5 @@ This repository contains the following key scripts:
 2.  **Convert to Parquet:** Run `csv_2_parquet.py` via `spark-submit`.
 3.  **Feature Engineering:** Run `feature_engineering.py` via `spark-submit`.
 4.  **Install Dependencies:** SSH into the Dataproc master node and run `bash install.sh`.
-5.  **Train Model:** Run `train_xgboost_adasyn.py` via `spark-submit` (in client mode) on the master node, providing the path to the processed features and a local path for the output model.
+5.  **Train Model:** Run `train_xgboost.py` via `spark-submit` (in client mode) on the master node, providing the path to the processed features and a local path for the output model.
 6.  **(Optional) Upload Model:** Copy the generated `.pkl` model file from the master node's local filesystem to GCS or HDFS if needed.
