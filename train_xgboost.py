@@ -1,4 +1,3 @@
-# train_xgboost_adasyn.py
 """
 Train an XGBoost classifier on the processed fraud‑detection data and **save it with Python’s built‑in `pickle`**.
 The script performs:
@@ -15,6 +14,7 @@ If the dataset is too large for driver memory, consider using XGBoost4J‑Spark 
 
 import argparse
 import pickle
+import os
 
 import numpy as np
 from sklearn.metrics import (
@@ -38,12 +38,27 @@ def spark_to_numpy(df, label_col: str):
     y = pdf[label_col].values.astype(int)
     return X, y
 
+def load_model(model_path):
+    if not os.path.exists(model_path):
+        print(f"Error: Model file not found at {model_path}")
+        return None
+    try:
+        with open(model_path, "rb") as f:
+            clf = pickle.load(f)
+        print(f"Successfully loaded model from: {model_path}")
+        if not isinstance(clf, XGBClassifier):
+             print(f"Warning: Loaded object from {model_path} might not be an XGBClassifier.")
+        return clf
+    except Exception as e:
+        print(f"Error loading model from {model_path}: {e}")
+        return None
 
-def main(processed_path: str, model_out: str, sampling_strategy: float):
+def main(processed_path: str, model_out: str, sampling_strategy: float, existing_clf=None):
     spark = SparkSession.builder.appName("Train-XGBoost-ADASYN").getOrCreate()
 
     print(f"Loading processed data from: {processed_path}")
     df = spark.read.parquet(processed_path)
+    df = df.sample(fraction=0.3, seed=42)
     print(f"Loaded {df.count():,} rows.")
 
     # Convert to NumPy for scikit‑learn / imbalanced‑learn
@@ -54,18 +69,26 @@ def main(processed_path: str, model_out: str, sampling_strategy: float):
     ada = ADASYN(sampling_strategy=sampling_strategy, random_state=42, n_neighbors=5)
     X_res, y_res = ada.fit_resample(X, y)
     print(f"Class distribution after ADASYN: {np.bincount(y_res)} (neg, pos)")
-
     # --- XGBoost classifier ---
-    clf = XGBClassifier(
-        n_estimators=100,
-        learning_rate=0.1,
-        max_depth=3,
-        eval_metric="logloss",
-        random_state=42,
-        n_jobs=-1,
-        use_label_encoder=False,
-    )
-    clf.fit(X_res, y_res)
+    if existing_clf:
+        print("Continuing training from loaded model...")
+        clf = existing_clf
+        # Use xgb_model parameter to continue training
+        clf.fit(X_res, y_res, xgb_model=clf)
+        print("Continued training complete.")
+    else:
+        print("Training new XGBoost model from scratch...")
+        clf = XGBClassifier(
+            n_estimators=100,
+            learning_rate=0.1,
+            max_depth=3,
+            eval_metric="logloss",
+            random_state=42,
+            n_jobs=-1, # Use all available CPU cores
+            use_label_encoder=False, # Recommended for newer XGBoost versions
+        )
+        clf.fit(X_res, y_res)
+        print("Initial training complete.")
 
     # --- Evaluation on original (un‑resampled) data ---
     y_pred = clf.predict(X)
@@ -89,8 +112,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train XGBoost with ADASYN oversampling and save via pickle.")
     parser.add_argument("--input", required=True, help="HDFS or local path to processed Parquet directory")
     parser.add_argument("--model-out", required=True, help="Destination path for the pickled model (e.g., model.pkl)")
-    parser.add_argument("--sampling-strategy", type=float, default=0.5,
+    parser.add_argument("--sampling-strategy", type=float, default=0.3,
                         help="ADASYN sampling_strategy (e.g., 0.5 ⇒ minority will be 50% of majority)")
+    parser.add_argument("--load",action='store_true', default=False, help="load the existing model and continue to train")
     args = parser.parse_args()
-
-    main(args.input, args.model_out, args.sampling_strategy)
+    model = None
+    if args.load:
+        model = load_model(args.model_out)
+        if model is None:
+            print("Failed to load model. Exiting.")
+            exit(1)
+    
+    main(args.input, args.model_out, args.sampling_strategy, existing_clf=model)

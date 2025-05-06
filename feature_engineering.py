@@ -111,7 +111,7 @@ def create_feature_engineering_pipeline(df, input_cols_to_exclude=None, label_co
 
 if __name__ == "__main__":
     # --- Configuration ---
-    HDFS_PARQUET_INPUT_PATH = "hdfs:///user/hs5413_nyu_edu/bank_fraud_data/sample_10pct/" # Input Parquet directory, use 10% dataset to speed up the training
+    HDFS_PARQUET_INPUT_PATH = "hdfs:///user/hs5413_nyu_edu/bank_fraud_data/parquet/" # Input Parquet directory
     HDFS_PROCESSED_OUTPUT_PATH = "hdfs:///user/hs5413_nyu_edu/bank_fraud_data/processed_features/" # Output directory for processed data
 
     # Columns to exclude from feature processing (e.g., unique IDs)

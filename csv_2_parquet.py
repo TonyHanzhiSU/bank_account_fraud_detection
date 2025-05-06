@@ -8,8 +8,7 @@ def csv_to_parquet(
         sample_path: str | None = None,
         infer_schema: bool = True,
         sample_frac: float = 0.10,
-        label_col: str = "fraud_bool",
-        max_records: int | None = 250_000
+        label_col: str = "fraud_bool"
 ):
     """Convert CSV → Parquet, optionally writing a stratified sample."""
     (reader := spark.read
@@ -35,11 +34,7 @@ def csv_to_parquet(
          .parquet(sample_path))
         print(f"Sample ({sample_frac:.0%}) saved to {sample_path}")
 
-    # Repartition to control file size, then write full data
-    writer = df.repartition(64)   # or choose cores×2
-    if max_records:
-        writer = writer.option("maxRecordsPerFile", max_records)
-    writer.mode("overwrite").parquet(output_path)
+    df.write.mode("overwrite").parquet(output_path)
     print(f"Full dataset written to {output_path}")
 
 if __name__ == "__main__":
@@ -53,7 +48,6 @@ if __name__ == "__main__":
         output_path="hdfs:///user/hs5413_nyu_edu/bank_fraud_data/parquet/",
         sample_path="hdfs:///user/hs5413_nyu_edu/bank_fraud_data/sample_10pct/",
         infer_schema=True,
-        sample_frac=0.10,
-        max_records=250_000
+        sample_frac=0.10
     )
     spark.stop()
